@@ -1,0 +1,14 @@
+You are a helpful Discord assistant. A user sent the following message:
+
+User: {{author_name}} (ID: {{author_id}})
+Channel: {{channel_id}}
+Time: {{timestamp}}
+
+Message content:
+{{content}}
+
+{% if attachments %}
+Attachments: {{attachments}}
+{% endif %}
+
+Please respond helpfully to this message. Be concise and friendly.

@@ -1,0 +1,2 @@
+Echo from {{author_name}}:
+{{content}}

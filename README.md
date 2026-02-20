@@ -5,6 +5,7 @@ A simple command-line tool for sending Discord notifications programmatically. `
 ## Features
 
 - 🚀 **Simple CLI Interface**: Send messages with a single command
+- 📸 **Image Support**: Attach images to your Discord messages
 - ⚙️ **Environment-based Configuration**: Secure token management via `.env` file
 - 📡 **Async Operations**: Built on Tokio for efficient HTTP requests
 - 🔒 **Secure**: No hardcoded credentials - all configuration via environment variables
@@ -131,26 +132,77 @@ discli "Hello, Discord!"
 
 ### Basic Usage
 
-The basic syntax is:
+discli uses a subcommand-based CLI structure. The primary commands are:
+
+- `discli send` - Send messages (text or text with images)
+- `discli image` - Send images with optional captions
+
+### Send Messages
+
+#### Text-Only Message
 
 ```bash
-discli "<message>"
+discli send "Hello from the command line!"
 ```
 
-#### Examples
+#### Message with Single Image
+
+```bash
+discli send "Check out this screenshot" --attach screenshot.png
+```
+
+#### Message with Multiple Images
+
+```bash
+discli send "Report attached" --attach fig1.png --attach fig2.png --attach fig3.png
+```
+
+#### Images Only (No Text)
+
+```bash
+discli send --attach photo.jpg
+```
+
+#### Message with Caption
+
+```bash
+discli send "Build complete" --attach result.png --caption "Deployment result"
+```
+
+### Using the Image Command
+
+The `image` command is a convenience alias for sending images:
+
+```bash
+discli image --attach screenshot.jpg --caption "Error screenshot"
+```
+
+### Basic Examples
 
 Send a simple message:
 
 ```bash
-discli "Hello from the command line!"
+discli send "Hello from the command line!"
 ```
 
 Send a message with emojis:
 
 ```bash
-discli "✅ Build completed successfully"
-discli "❌ Build failed"
-discli "⚠️ Warning: High CPU usage detected"
+discli send "✅ Build completed successfully"
+discli send "❌ Build failed"
+discli send "⚠️ Warning: High CPU usage detected"
+```
+
+### Legacy Syntax (Deprecated)
+
+For backward compatibility, the old syntax still works but shows a deprecation warning:
+
+```bash
+# Old way (deprecated)
+discli "Hello, Discord!"
+
+# New recommended way
+discli send "Hello, Discord!"
 ```
 
 ### Advanced Examples
@@ -216,28 +268,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      
+
       - name: Build project
         run: cargo build --release
-      
+
       - name: Setup discli
         run: |
           cargo install --path .
           echo "DISCORD_TOKEN=${{ secrets.DISCORD_TOKEN }}" > discli.env
           echo "DISCORD_CHANNEL_ID=${{ secrets.DISCORD_CHANNEL_ID }}" >> discli.env
-      
+
       - name: Send notification on success
         if: success()
-        run: discli "✅ Build successful - ${{ github.event.head_commit.message }}"
-      
+        run: discli send "✅ Build successful - ${{ github.event.head_commit.message }}"
+
       - name: Send notification on failure
         if: failure()
-        run: discli "❌ Build failed - ${{ github.event.head_commit.message }}"
+        run: discli send "❌ Build failed - ${{ github.event.head_commit.message }}"
 ```
 
 #### GitLab CI
@@ -250,13 +302,13 @@ build:
     - cargo install --path .
     - echo "DISCORD_TOKEN=$DISCORD_TOKEN" > discli.env
     - echo "DISCORD_CHANNEL_ID=$DISCORD_CHANNEL_ID" >> discli.env
-    - discli "🚀 Pipeline $CI_PIPELINE_ID completed on $CI_COMMIT_REF_NAME"
+    - discli send "🚀 Pipeline $CI_PIPELINE_ID completed on $CI_COMMIT_REF_NAME"
   after_script:
     - |
       if [ $CI_JOB_STATUS == "success" ]; then
-        discli "✅ Build $CI_JOB_ID succeeded"
+        discli send "✅ Build $CI_JOB_ID succeeded"
       else
-        discli "❌ Build $CI_JOB_ID failed"
+        discli send "❌ Build $CI_JOB_ID failed"
       fi
 ```
 
@@ -277,7 +329,7 @@ pipeline {
                     cargo install --path .
                     echo "DISCORD_TOKEN=$DISCORD_TOKEN" > discli.env
                     echo "DISCORD_CHANNEL_ID=$DISCORD_CHANNEL_ID" >> discli.env
-                    discli "Build ${BUILD_NUMBER} completed: ${currentBuild.currentResult}"
+                    discli send "Build ${BUILD_NUMBER} completed: ${currentBuild.currentResult}"
                 '''
             }
         }
@@ -295,9 +347,9 @@ pipeline {
 
 # Check if service is running
 if curl -sf http://localhost:3000/health > /dev/null; then
-    discli "✅ Service healthy at $(date)"
+    discli send "✅ Service healthy at $(date)"
 else
-    discli "❌ Service down at $(date)"
+    discli send "❌ Service down at $(date)"
 fi
 ```
 
@@ -311,7 +363,7 @@ THRESHOLD=90
 USAGE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
 
 if [ $USAGE -gt $THRESHOLD ]; then
-    discli "⚠️ Disk usage alert: ${USAGE}% used on root partition"
+    discli send "⚠️ Disk usage alert: ${USAGE}% used on root partition"
 fi
 ```
 
@@ -322,10 +374,23 @@ fi
 # backup_notify.sh
 
 if ./backup.sh; then
-    discli "✅ Backup completed successfully at $(date)"
+    discli send "✅ Backup completed successfully at $(date)"
 else
-    discli "❌ Backup failed at $(date)"
+    discli send "❌ Backup failed at $(date)"
 fi
+```
+
+#### Alert with Screenshot
+
+```bash
+#!/bin/bash
+# alert_with_screenshot.sh
+
+# Take screenshot
+scrot -u alert_screenshot.png
+
+# Send alert with image
+discli send "⚠️ High CPU detected" --attach alert_screenshot.png --caption "CPU usage graph"
 ```
 
 #### Scheduled Cron Jobs
@@ -340,14 +405,39 @@ fi
 ### Command Syntax
 
 ```bash
-discli <message>
+discli <subcommand> [options]
 ```
 
-### Parameters
+### Subcommands
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `message` | string | Yes | The message content to send to Discord |
+| Command | Description |
+|---------|-------------|
+| `send` | Send a message (text or text with images) |
+| `image` | Send images with optional captions |
+
+### Send Command Options
+
+| Option | Short | Type | Description |
+|--------|--------|------|-------------|
+| `content` | - | string | Message content to send (optional) |
+| `--attach` | `-a` | PATH | Image file(s) to attach (can be repeated) |
+| `--caption` | `-c` | TEXT | Alt text/description for attachments |
+| `--embed-url` | - | URL | Embed image URLs (future feature) |
+
+### Image Command Options
+
+| Option | Short | Type | Description |
+|--------|--------|------|-------------|
+| `--attach` | `-a` | PATH | Image file(s) to attach (required, can be repeated) |
+| `--caption` | `-c` | TEXT | Caption text for the images |
+| `--embed-url` | - | URL | Embed image URLs (future feature) |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|-----------|-------------|
+| `DISCORD_TOKEN` | Yes | Discord bot token |
+| `DISCORD_CHANNEL_ID` | Yes | Discord channel ID to send messages to |
 
 ### Exit Codes
 
@@ -360,20 +450,20 @@ discli <message>
 
 **Success:**
 ```
-Message sent successfully to channel 123456789012345678
+Successfully sent text message to channel 123456789012345678
+```
+
+**Success with Images:**
+```
+Successfully sent message with 2 image attachment(s) to channel 123456789012345678
 ```
 
 ### Standard Error
 
-**Missing Arguments:**
+**Missing Command:**
 ```
-Usage: discli <message>
-Environment Variables:
-  DISCORD_TOKEN - Your Discord bot token (required)
-  DISCORD_CHANNEL_ID - Your Discord channel ID (required)
-
-Example:
-  discli "Hello from Rust!"
+Error: No subcommand provided
+Usage: discli <subcommand> [options]
 ```
 
 **Missing Configuration:**
@@ -389,13 +479,29 @@ Please set it in your environment or in a discli.env file
 
 **API Error:**
 ```
-Error sending message: Discord API returned error status 403: Missing Access
+Error: Discord API error: Discord API returned error status 403: Missing Access
+```
+
+**Attachment Error:**
+```
+Error: Attachment error: File not found: /path/to/image.png
+```
+
+```
+Error: Attachment error: File exceeds Discord's 25MB limit
+```
+
+**Validation Error:**
+```
+Error: Validation error: Cannot attach more than 10 images (got 11)
 ```
 
 ### Message Limitations
 
 - Maximum message length: 2000 characters (Discord limit)
-- Message type: Plain text only
+- Maximum attachments per message: 10 files
+- Maximum file size: 25 MB per file
+- Supported image formats: PNG, JPG, GIF, WebP, and other standard image formats
 - Encoding: UTF-8
 
 ## Dependencies
@@ -404,11 +510,14 @@ Error sending message: Discord API returned error status 403: Missing Access
 
 | Crate | Version | Description |
 |-------|---------|-------------|
-| `reqwest` | 0.12 | HTTP client for making API requests |
+| `reqwest` | 0.12 | HTTP client for making API requests (with multipart support) |
 | `tokio` | 1.40 | Async runtime for Rust |
 | `serde` | 1.0 | Serialization framework |
 | `serde_json` | 1.0 | JSON serialization support |
 | `dotenv` | 0.15 | Environment variable loading from `.env` files |
+| `clap` | 4.5 | Command-line argument parsing |
+| `mime_guess` | 2.0 | MIME type detection for file uploads |
+| `thiserror` | 1.0 | Error handling library |
 
 ### System Requirements
 

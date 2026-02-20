@@ -1,100 +1,94 @@
-use reqwest::Client;
-use serde_json::json;
-use std::env;
-use std::process;
+//! discli - Discord CLI with image support
+//!
+//! A command-line tool for sending Discord notifications with support for
+//! text messages and image attachments.
+
+mod cli;
+mod commands;
+mod config;
+mod discord;
+mod error;
+mod hooks;
+mod message;
+mod processing;
+mod prompt;
+
+use clap::Parser;
+use error::Result;
 
 #[tokio::main]
 async fn main() {
-    // Load environment variables from discli.env file if it exists
-    dotenv::from_filename("discli.env").ok();
-
-    // Parse command-line arguments
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Usage: {} <message>", args[0]);
-        eprintln!("Environment Variables:");
-        eprintln!("  DISCORD_TOKEN - Your Discord bot token (required)");
-        eprintln!("  DISCORD_CHANNEL_ID - Your Discord channel ID (required)");
-        eprintln!("\nExample:");
-        eprintln!("  {} \"Hello from Rust!\"", args[0]);
-        process::exit(1);
-    }
-
-    let message = &args[1];
-
-    // Get Discord channel ID from environment variable
-    let channel_id = match env::var("DISCORD_CHANNEL_ID") {
-        Ok(id) => id,
-        Err(_) => {
-            eprintln!("Error: DISCORD_CHANNEL_ID environment variable not set");
-            eprintln!("Please set it in your environment or in a discli.env file");
-            process::exit(1);
-        }
-    };
-
-    // Get Discord token from environment variable
-    let token = match env::var("DISCORD_TOKEN") {
-        Ok(t) => t,
-        Err(_) => {
-            eprintln!("Error: DISCORD_TOKEN environment variable not set");
-            eprintln!("Please set it in your environment or in a discli.env file");
-            process::exit(1);
-        }
-    };
-
-    // Send the message
-    match send_discord_message(&token, &channel_id, message).await {
-        Ok(_) => {
-            println!("Message sent successfully to channel {}", channel_id);
-        }
-        Err(e) => {
-            eprintln!("Error sending message: {}", e);
-            process::exit(1);
-        }
+    if let Err(e) = run().await {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
     }
 }
 
-async fn send_discord_message(
-    token: &str,
-    channel_id: &str,
-    message: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Create HTTP client
-    let client = Client::new();
+/// Main application entry point
+async fn run() -> Result<()> {
+    // Parse CLI arguments
+    let cli = cli::Cli::parse();
 
-    // Construct the API URL
-    let url = format!(
-        "https://discord.com/api/v10/channels/{}/messages",
-        channel_id
-    );
+    // Load configuration from environment
+    let config = config::Config::load()?;
 
-    // Prepare the request body
-    let body = json!({
-        "content": message
-    });
-
-    // Send POST request to Discord API
-    let response = client
-        .post(&url)
-        .header("Authorization", format!("Bot {}", token))
-        .header("Content-Type", "application/json")
-        .json(&body)
-        .send()
-        .await?;
-
-    // Check if the request was successful
-    let status = response.status();
-    
-    if !status.is_success() {
-        let error_text = response.text().await?;
-        return Err(format!(
-            "Discord API returned error status {}: {}",
-            status, error_text
-        )
-        .into());
+    // Handle backward compatibility for legacy syntax
+    if !cli.legacy_message.is_empty() {
+        handle_legacy_syntax(&config, cli.legacy_message).await
+    } else {
+        handle_subcommands(&config, cli.command).await
     }
-
-    Ok(())
 }
 
+/// Handle legacy syntax for backward compatibility
+///
+/// Legacy syntax: `discli "message"`
+/// New syntax: `discli send "message"`
+async fn handle_legacy_syntax(config: &config::Config, legacy_message: Vec<String>) -> Result<()> {
+    // Warn about deprecation
+    eprintln!("⚠️  Warning: Direct message argument is deprecated.");
+    eprintln!("  Current: discli \"message\"");
+    eprintln!("  New:     discli send \"message\"");
+    eprintln!();
+
+    // Use legacy behavior
+    let content = legacy_message.join(" ");
+    commands::send::execute(config, content, Vec::new(), Vec::new(), None).await
+}
+
+/// Handle subcommands
+async fn handle_subcommands(
+    config: &config::Config,
+    command: Option<cli::Commands>,
+) -> Result<()> {
+    match command {
+        Some(cli::Commands::Send {
+            content,
+            attach,
+            embed_url,
+            caption,
+        }) => {
+            commands::send::execute(config, content, attach, embed_url, caption).await
+        }
+        Some(cli::Commands::Image {
+            attach,
+            caption,
+            embed_url,
+        }) => {
+            commands::image::execute(config, attach, caption, embed_url).await
+        }
+        Some(cli::Commands::Listen {
+            foreground,
+            hooks_file,
+            prompts_dir,
+            verbose,
+        }) => {
+            commands::listen::execute(config, hooks_file, prompts_dir, verbose).await
+        }
+        None => {
+            // No subcommand provided, show help
+            // Use clap's built-in help
+            std::process::exit(0);
+        }
+    }
+}

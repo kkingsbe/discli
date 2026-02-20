@@ -1,0 +1,54 @@
+# hooks.yaml
+# Test hook configuration for discli
+# 
+# To use:
+# 1. Update CHANNEL_ID below with your Discord channel ID
+# 2. Run: discli listen
+# 3. Send "!echo hello" in the specified channel
+
+version: "1.0"
+
+# Global settings
+settings:
+  on_error: "log"
+  rate_limit:
+    per_user: 5
+    per_channel: 10
+    window_seconds: 60
+
+# Prompt templates directory
+prompts_dir: "./prompts"
+
+# Hook definitions
+hooks:
+  - id: "test-echo"
+    name: "Test Echo Hook"
+    enabled: true
+    
+    # Channel IDs to listen on
+    # TODO: Replace with your actual Discord channel ID
+    # To get channel ID: enable Developer Mode in Discord, right-click channel -> Copy ID
+    channels:
+      - "1474540929116541100"
+    
+    # Trigger configuration
+    # Triggers when message starts with "!echo"
+    trigger:
+      type: "prefix"
+      prefix: "!echo"
+    
+    # Path to prompt file (relative to prompts_dir)
+    # Using the simple-echo prompt that echoes back the message
+    prompt_file: "simple-echo.txt"
+    
+    # Action to take when hook triggers
+    # reply = send a reply in the same channel
+    action:
+      type: "reply"
+    
+    # Processing configuration
+    # Uses default command processor (processes prompt and returns response)
+    processing:
+      timeout_seconds: 30
+      processor_type: "command"
+      cmd: ["python", "-c", "import sys; print(sys.stdin.read())"]

@@ -1,0 +1,7 @@
+Command request from {{author_name}}
+
+User ID: {{author_id}}
+Message: {{content}}
+Timestamp: {{timestamp}}
+
+Process this command and return a response.

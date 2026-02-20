@@ -1,0 +1,96 @@
+# hooks.yaml.example
+# Copy this file to hooks.yaml and configure your hooks
+
+version: "1.0"
+
+# Global settings
+settings:
+  on_error: "log"
+  rate_limit:
+    per_user: 5
+    per_channel: 10
+    window_seconds: 60
+
+# Prompt templates directory
+prompts_dir: "./prompts"
+
+# Hook definitions
+hooks:
+  - id: "ai-respond"
+    name: "AI Response Hook"
+    enabled: false
+    
+    # Channel IDs to listen on (as strings)
+    channels:
+      - "123456789012345678"
+    
+    # Trigger configuration
+    trigger:
+      type: "mention"
+    
+    # Path to prompt file (relative to prompts_dir or absolute)
+    prompt_file: "ai-response.txt"
+    
+    # Action to take when hook triggers
+    action:
+      type: "reply"
+    
+    # Processing configuration
+    processing:
+      timeout_seconds: 30
+      type: "command"
+      cmd: ["./scripts/process.sh"]
+
+  - id: "command-handler"
+    name: "Command Handler"
+    enabled: false
+    
+    channels:
+      - "123456789012345678"
+    
+    trigger:
+      type: "prefix"
+      prefix: "!"
+    
+    prompt_file: "command.txt"
+    
+    # Optional filter for specific users/roles
+    filter:
+      users: []
+      roles: []
+    
+    action:
+      type: "reply"
+
+  - id: "regex-catcher"
+    name: "Regex Pattern Matcher"
+    enabled: false
+    
+    channels:
+      - "123456789012345678"
+    
+    trigger:
+      type: "regex"
+      pattern: "(?i)(help|support|question)"
+    
+    prompt_file: "support.txt"
+    
+    action:
+      type: "reply"
+
+  - id: "forward-messages"
+    name: "Forward to Channel"
+    enabled: false
+    
+    channels:
+      - "123456789012345678"
+    
+    trigger:
+      type: "contains"
+      substring: "forward"
+    
+    prompt_file: "forward.txt"
+    
+    action:
+      type: "forward"
+      channel_id: "987654321098765432"
