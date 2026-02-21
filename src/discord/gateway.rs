@@ -106,8 +106,6 @@ impl DiscordGateway {
                         "Received message from {} in channel {}",
                         msg.author.name, msg.channel_id
                     );
-                    eprintln!("[DEBUG] Gateway received message: '{}' from {} in channel {}", 
-                        msg.content, msg.author.name, msg.channel_id);
                     handler(*msg);
                 }
                 Event::Ready(ready) => {

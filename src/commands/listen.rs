@@ -82,9 +82,6 @@ pub async fn execute(
             
             // Check each hook
             for hook in hooks.iter() {
-                if verbose {
-                    println!("[DEBUG] Checking hook '{}' with trigger: {:?}", hook.id, hook.trigger);
-                }
                 if should_trigger(hook, &event) {
                     if verbose {
                         println!("Triggering hook: {}", hook.id);

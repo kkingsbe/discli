@@ -58,29 +58,20 @@ pub fn should_trigger(
     message: &MessageCreate,
 ) -> bool {
     // Check channel
-    let channel_match = matches_channels(message, &hook.channels);
-    if !channel_match {
-        eprintln!("[DEBUG] Channel mismatch: message in {}, hook expects {:?}", 
-            message.0.channel_id, hook.channels);
+    if !matches_channels(message, &hook.channels) {
         return false;
     }
     
     // Check trigger
-    let trigger_match = hook.trigger.matches(message);
-    if !trigger_match {
-        eprintln!("[DEBUG] Trigger mismatch: message '{}' doesn't match trigger {:?}", 
-            message.0.content, hook.trigger);
+    if !hook.trigger.matches(message) {
         return false;
     }
     
     // Check filter
-    let filter_match = matches_filter(message, &hook.filter);
-    if !filter_match {
-        eprintln!("[DEBUG] Filter mismatch: message blocked by filter");
+    if !matches_filter(message, &hook.filter) {
         return false;
     }
     
-    eprintln!("[DEBUG] Trigger matched for hook: {}", hook.id);
     true
 }
 

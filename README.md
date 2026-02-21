@@ -10,12 +10,23 @@ A simple command-line tool for sending Discord notifications programmatically. `
 - 📡 **Async Operations**: Built on Tokio for efficient HTTP requests
 - 🔒 **Secure**: No hardcoded credentials - all configuration via environment variables
 - 🎯 **Lightweight**: Minimal dependencies and small binary size
+- 🪝 **Hooks System**: Listen mode that responds to Discord messages with custom commands and automations
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
+- [Hooks System](#hooks-system)
+  - [Overview](#overview)
+  - [Quick Start](#quick-start)
+  - [Configuration File](#configuration-file)
+  - [Trigger Types](#trigger-types)
+  - [Processor Types](#processor-types)
+  - [Actions](#actions)
+  - [Prompt Templates](#prompt-templates)
+  - [Environment Variables](#environment-variables-1)
+  - [Example Configurations](#example-configurations)
 - [Usage](#usage)
   - [Basic Usage](#basic-usage)
   - [Advanced Examples](#advanced-examples)
@@ -128,6 +139,464 @@ export DISCORD_CHANNEL_ID="123456789012345678"
 discli "Hello, Discord!"
 ```
 
+## Hooks System
+
+The hooks system enables `discli` to listen to Discord channels and respond to messages automatically. When running in listen mode, the bot monitors configured channels and executes actions when messages match defined triggers.
+
+### Overview
+
+The hooks system provides:
+
+- **Listen Mode**: Monitor Discord channels for matching messages
+- **Trigger Matching**: Match messages by prefix, content, regex, or mentions
+- **Command Processor**: Execute shell commands and return the output
+- **HTTP Processor**: Send messages to webhook endpoints for external processing
+- **Flexible Actions**: Reply in channel, send DM, forward to another channel, or call webhooks
+- **Rate Limiting**: Prevent abuse with configurable rate limits
+- **Prompt Templates**: Process messages using customizable templates
+
+### Quick Start
+
+1. Copy the example hooks configuration:
+
+```bash
+cp hooks.yaml.example hooks.yaml
+```
+
+2. Edit `hooks.yaml` to configure your hooks (see [Configuration File](#configuration-file) below)
+
+3. Ensure you have a Discord bot token in your `.env` file:
+
+```env
+DISCORD_TOKEN=your_bot_token_here
+```
+
+4. Start the listener:
+
+```bash
+discli listen
+```
+
+5. Send a message that matches your trigger (e.g., `!echo hello`) in the configured channel
+
+### Configuration File
+
+The hooks system uses a YAML configuration file (default: `hooks.yaml`). Here's the complete structure:
+
+```yaml
+version: "1.0"
+
+# Global settings
+settings:
+  on_error: "log"           # Strategy when errors occur: log, ignore, notify
+  rate_limit:
+    per_user: 5              # Max triggers per user in window
+    per_channel: 10         # Max triggers per channel in window
+    window_seconds: 60      # Rate limit window in seconds
+
+# Prompt templates directory
+prompts_dir: "./prompts"
+
+# Hook definitions
+hooks:
+  - id: "unique-hook-id"
+    name: "Human Readable Name"
+    enabled: true
+    
+    # Channel IDs to listen on (as strings)
+    channels:
+      - "123456789012345678"
+    
+    # Trigger configuration (see Trigger Types below)
+    trigger:
+      type: "prefix"
+      prefix: "!echo"
+    
+    # Path to prompt file (relative to prompts_dir)
+    prompt_file: "simple-echo.txt"
+    
+    # Optional filter for specific users/roles
+    filter:
+      users: []
+      roles: []
+    
+    # Action to take when hook triggers
+    action:
+      type: "reply"
+    
+    # Processing configuration
+    processing:
+      timeout_seconds: 30
+      processor_type: "command"
+      cmd: ["python", "-c", "import sys; print(sys.stdin.read())"]
+```
+
+### Trigger Types
+
+The hooks system supports the following trigger types:
+
+| Type | Description | Configuration |
+|------|-------------|----------------|
+| `prefix` | Trigger when message starts with a specific prefix | `prefix: "!"` |
+| `contains` | Trigger when message contains a substring | `substring: "hello"` |
+| `regex` | Trigger when message matches a regex pattern | `pattern: "(?i)(help|support)"` |
+| `mention` | Trigger when bot is mentioned | (no additional config) |
+| `any` | Trigger on every message | (no additional config) |
+
+#### Prefix Trigger
+
+Triggers when the message starts with a specific prefix (like a command):
+
+```yaml
+trigger:
+  type: "prefix"
+  prefix: "!echo"
+```
+
+Matches: `!echo hello`, `!echo test`, `!echo`
+
+#### Contains Trigger
+
+Triggers when the message contains a specific substring:
+
+```yaml
+trigger:
+  type: "contains"
+  substring: "help"
+```
+
+Matches: "Can someone help me?", "help needed", "please help"
+
+#### Regex Trigger
+
+Triggers when the message matches a regex pattern:
+
+```yaml
+trigger:
+  type: "regex"
+  pattern: "^!\\w+.*"
+```
+
+Matches any message starting with `!` followed by word characters.
+
+#### Mention Trigger
+
+Triggers when the bot is mentioned in a message:
+
+```yaml
+trigger:
+  type: "mention"
+```
+
+### Processor Types
+
+Processors determine how the matched message is processed and what response is generated.
+
+#### Command Processor
+
+Executes a shell command and returns its stdout. The message content is passed to stdin.
+
+```yaml
+processing:
+  processor_type: "command"
+  cmd: ["python", "-c", "import sys; print(sys.stdin.read())"]
+  timeout_seconds: 30
+```
+
+**Example - Echo Command:**
+```yaml
+processing:
+  processor_type: "command"
+  cmd: ["echo", "You said: "]
+  # stdin receives the processed prompt
+```
+
+**Example - Python Script:**
+```yaml
+processing:
+  processor_type: "command"
+  cmd: ["python", "scripts/my_processor.py"]
+  timeout_seconds: 30
+```
+
+#### HTTP Processor
+
+Sends the processed prompt to an HTTP endpoint and returns the response.
+
+```yaml
+processing:
+  processor_type: "http"
+  url: "https://api.example.com/process"
+  timeout_seconds: 30
+```
+
+The HTTP processor sends a POST request with JSON body:
+
+```json
+{
+  "prompt": "The processed prompt content",
+  "metadata": {
+    "author_name": "username",
+    "author_id": "123456789",
+    "channel_id": "123456789012345678",
+    "message_id": "123456789012345678",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+### Actions
+
+Actions define what happens after processing completes:
+
+| Type | Description | Configuration |
+|------|-------------|----------------|
+| `reply` | Send a reply in the same channel | (no additional config) |
+| `send_dm` | Send a direct message to the user | (no additional config) |
+| `forward` | Forward to another channel | `channel_id: "123456789"` |
+| `webhook` | Send to a webhook URL | `url: "https://..."` |
+
+```yaml
+# Reply in channel
+action:
+  type: "reply"
+
+# Send DM to user
+action:
+  type: "send_dm"
+
+# Forward to another channel
+action:
+  type: "forward"
+  channel_id: "987654321098765432"
+
+# Send to webhook
+action:
+  type: "webhook"
+  url: "https://discord.com/api/webhooks/..."
+```
+
+### Prompt Templates
+
+Prompt templates transform the incoming message before processing. They support variable substitution:
+
+| Variable | Description |
+|----------|-------------|
+| `{{author_name}}` | Username of the message author |
+| `{{author_id}}` | Discord ID of the author |
+| `{{channel_id}}` | Channel ID where message was sent |
+| `{{message_id}}` | Message ID |
+| `{{content}}` | Raw message content |
+| `{{timestamp}}` | Message timestamp (ISO 8601) |
+| `{{attachments}}` | List of attachment URLs |
+
+#### Example Prompt Template
+
+Create a file in your prompts directory (e.g., `prompts/simple-echo.txt`):
+
+```
+Echo from {{author_name}}:
+{{content}}
+```
+
+When a message "hello" is received, the processed prompt becomes:
+
+```
+Echo from MyUser:
+hello
+```
+
+This is then passed to the command processor or HTTP endpoint.
+
+### Environment Variables
+
+The hooks system requires the following environment variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DISCORD_TOKEN` | Yes | Discord bot token with message content intent |
+| `DISCORD_CHANNEL_ID` | No | Default channel for send/image commands |
+| `HOOK_ENABLED` | No | Enable hook system (set to "true" or "1") |
+| `HOOKS_FILE` | No | Path to hooks.yaml (default: `./hooks.yaml`) |
+| `PROMPTS_DIR` | No | Path to prompts directory (default: `./prompts`) |
+| `LOG_LEVEL` | No | Logging level: debug, info, warn, error |
+
+#### Example .env File
+
+```env
+# Discord Bot Configuration
+DISCORD_TOKEN=your_actual_discord_bot_token_here
+
+# Hook System Configuration
+HOOKS_FILE=./hooks.yaml
+PROMPTS_DIR=./prompts
+LOG_LEVEL=info
+```
+
+### Example Configurations
+
+#### Simple Echo Command
+
+Responds with the same message content:
+
+```yaml
+version: "1.0"
+
+prompts_dir: "./prompts"
+
+hooks:
+  - id: "echo"
+    name: "Echo Command"
+    enabled: true
+    channels:
+      - "123456789012345678"
+    trigger:
+      type: "prefix"
+      prefix: "!echo"
+    prompt_file: "simple-echo.txt"
+    action:
+      type: "reply"
+    processing:
+      processor_type: "command"
+      cmd: ["python", "-c", "import sys; print(sys.stdin.read())"]
+```
+
+**Prompt (`prompts/simple-echo.txt`):**
+```
+{{content}}
+```
+
+#### HTTP Webhook Integration
+
+Forward matched messages to an external API:
+
+```yaml
+version: "1.0"
+
+hooks:
+  - id: "webhook-handler"
+    name: "Webhook Handler"
+    enabled: true
+    channels:
+      - "123456789012345678"
+    trigger:
+      type: "prefix"
+      prefix: "!api"
+    prompt_file: "api-request.txt"
+    action:
+      type: "reply"
+    processing:
+      processor_type: "http"
+      url: "https://api.example.com/discord handler"
+      timeout_seconds: 30
+```
+
+#### Regex Pattern Matching
+
+Match messages using regex and respond accordingly:
+
+```yaml
+version: "1.0"
+
+hooks:
+  - id: "help-detector"
+    name: "Help Request Detector"
+    enabled: true
+    channels:
+      - "123456789012345678"
+    trigger:
+      type: "regex"
+      pattern: "(?i)(help|support|need assistance)"
+    prompt_file: "support.txt"
+    action:
+      type: "reply"
+    processing:
+      processor_type: "command"
+      cmd: ["python", "scripts/handle_support.py"]
+```
+
+#### Forward to Channel
+
+Automatically forward messages to another channel:
+
+```yaml
+version: "1.0"
+
+hooks:
+  - id: "log-commands"
+    name: "Command Logger"
+    enabled: true
+    channels:
+      - "123456789012345678"
+    trigger:
+      type: "prefix"
+      prefix: "!"
+    action:
+      type: "forward"
+      channel_id: "987654321098765432"
+```
+
+#### Rate-Limited Command Handler
+
+With custom rate limiting:
+
+```yaml
+version: "1.0"
+
+settings:
+  on_error: "log"
+  rate_limit:
+    per_user: 3
+    per_channel: 10
+    window_seconds: 60
+
+hooks:
+  - id: "rate-limited-echo"
+    name: "Rate Limited Echo"
+    enabled: true
+    channels:
+      - "123456789012345678"
+    trigger:
+      type: "prefix"
+      prefix: "!echo"
+    prompt_file: "simple-echo.txt"
+    action:
+      type: "reply"
+    processing:
+      processor_type: "command"
+      cmd: ["echo", "Processed: "]
+```
+
+### Using the Listen Command
+
+Start the hook listener:
+
+```bash
+# Using default configuration (hooks.yaml)
+discli listen
+
+# Using custom hooks file
+discli listen --hooks-file custom-hooks.yaml
+
+# Using custom prompts directory
+discli listen --prompts-dir ./custom-prompts
+
+# Verbose output
+discli listen --verbose
+```
+
+#### Listen Command Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--hooks-file` | `-f` | Path to hooks.yaml file |
+| `--prompts-dir` | `-p` | Path to prompts directory |
+| `--verbose` | `-v` | Enable verbose output |
+
+The listener will connect to Discord and start monitoring configured channels. Press `Ctrl+C` to stop.
+
+---
+
 ## Usage
 
 ### Basic Usage
@@ -136,6 +605,7 @@ discli uses a subcommand-based CLI structure. The primary commands are:
 
 - `discli send` - Send messages (text or text with images)
 - `discli image` - Send images with optional captions
+- `discli listen` - Start hook listener to respond to Discord messages
 
 ### Send Messages
 
@@ -414,6 +884,7 @@ discli <subcommand> [options]
 |---------|-------------|
 | `send` | Send a message (text or text with images) |
 | `image` | Send images with optional captions |
+| `listen` | Start hook listener to respond to Discord messages |
 
 ### Send Command Options
 
@@ -431,6 +902,14 @@ discli <subcommand> [options]
 | `--attach` | `-a` | PATH | Image file(s) to attach (required, can be repeated) |
 | `--caption` | `-c` | TEXT | Caption text for the images |
 | `--embed-url` | - | URL | Embed image URLs (future feature) |
+
+### Listen Command Options
+
+| Option | Short | Type | Description |
+|--------|--------|------|-------------|
+| `--hooks-file` | `-f` | PATH | Path to hooks.yaml file (default: `./hooks.yaml`) |
+| `--prompts-dir` | `-p` | PATH | Path to prompts directory (default: `./prompts`) |
+| `--verbose` | `-v` | flag | Enable verbose output |
 
 ### Environment Variables
 

@@ -1,9 +1,13 @@
 [package]
 name = "discli"
-version = "0.1.0"
-edition = "2024"
-description = "A CLI tool for sending Discord notifications"
+version = "0.2.0"
+edition = "2021"
+description = "A CLI tool for Discord with send, listen, and AI response modes"
 license = "MIT"
+repository = "https://github.com/kyle/discli"
+
+[package.metadata]
+exclude = ["*.env", "discli.env"]
 
 [dependencies]
 reqwest = { version = "0.12", features = ["json", "multipart"] }

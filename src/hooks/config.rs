@@ -239,16 +239,8 @@ impl HooksConfig {
         let content = std::fs::read_to_string(path)
             .map_err(|e| DiscliError::Config(format!("Failed to read hooks file: {}", e)))?;
         
-        eprintln!("[DEBUG] Raw YAML content:\n{}", content);
-        
         let config: HooksConfig = serde_yaml::from_str(&content)
             .map_err(|e| DiscliError::Config(format!("Failed to parse hooks.yaml: {}", e)))?;
-        
-        // Debug: print the first hook's processing config
-        if let Some(hook) = config.hooks.first() {
-            eprintln!("[DEBUG] Loaded processing: timeout={}, processor_type={}, cmd={:?}", 
-                hook.processing.timeout_seconds, hook.processing.processor_type, hook.processing.cmd);
-        }
         
         // Validate configuration
         config.validate()?;
@@ -288,9 +280,6 @@ impl HookConfig {
             }
             other => CompiledTrigger::from(other.clone()),
         };
-        
-        eprintln!("[DEBUG] Compiled hook: id={}, action={:?}, processor_type={}, cmd={:?}", 
-            self.id, self.action, self.processing.processor_type, self.processing.cmd);
         
         Ok(CompiledHookConfig {
             id: self.id.clone(),
