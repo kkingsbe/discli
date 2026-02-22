@@ -73,13 +73,8 @@ pub async fn send_multipart_message(
 ) -> Result<()> {
     let mut form = reqwest::multipart::Form::new();
 
-    // Add content if present
-    if let Some(text) = content {
-        form = form.text("content", text.clone());
-    }
-
-    // Add payload_json if we have attachments
-    if !attachments.is_empty() {
+    // Add payload_json if we have attachments (or content to send)
+    if !attachments.is_empty() || content.is_some() {
         // Build attachments array
         let mut payload_attachments = Vec::new();
         for (index, attachment) in attachments.iter().enumerate() {
@@ -96,10 +91,22 @@ pub async fn send_multipart_message(
             payload_attachments.push(attachment_json);
         }
 
-        let payload_json = json!({
-            "attachments": payload_attachments
-        });
+        // Build payload_json with content and attachments
+        // Note: Discord requires content to be in payload_json when using multipart
+        let payload_json = if let Some(text) = content {
+            json!({
+                "content": text,
+                "attachments": payload_attachments
+            })
+        } else {
+            json!({
+                "attachments": payload_attachments
+            })
+        };
         form = form.text("payload_json", payload_json.to_string());
+    } else if let Some(text) = content {
+        // No attachments but have content - use simple content field
+        form = form.text("content", text.clone());
     }
 
     // Add attachments
