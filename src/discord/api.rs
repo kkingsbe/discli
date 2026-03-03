@@ -1,6 +1,6 @@
 //! Discord API request handlers
 
-use crate::discord::types::FileAttachment;
+use crate::discord::types::{Embed, FileAttachment};
 use crate::error::{DiscliError, Result};
 use reqwest::Client;
 use serde_json::json;
@@ -159,4 +159,57 @@ async fn check_response(response: reqwest::Response) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Send a message with rich embeds to Discord
+///
+/// # Arguments
+///
+/// * `client` - HTTP client to use for the request
+/// * `url` - Full API URL to send the message to
+/// * `token` - Discord bot token
+/// * `content` - Optional message content (text above embeds)
+/// * `embeds` - List of embeds to include (max 10)
+///
+/// # Returns
+///
+/// `Ok(())` if the message was sent successfully
+///
+/// # Errors
+///
+/// Returns an error if the HTTP request fails or Discord returns an error
+pub async fn send_embed_message(
+    client: &Client,
+    url: &str,
+    token: &str,
+    content: &Option<String>,
+    embeds: &[Embed],
+) -> Result<()> {
+    // Validate embed count
+    if embeds.len() > 10 {
+        return Err(DiscliError::Validation(format!(
+            "Cannot have more than 10 embeds (got {})",
+            embeds.len()
+        )));
+    }
+
+    // Build the message payload
+    let mut payload = json!({
+        "embeds": embeds
+    });
+
+    // Add content if provided
+    if let Some(text) = content {
+        payload["content"] = json!(text);
+    }
+
+    let response = client
+        .post(url)
+        .header("Authorization", format!("Bot {}", token))
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .await?;
+
+    check_response(response).await
 }

@@ -79,6 +79,69 @@ pub enum Commands {
         embed_url: Vec<String>,
     },
 
+    /// Send a rich embed message
+    ///
+    /// Create visually rich Discord embeds with custom styling.
+    /// Perfect for recipes, notifications, and formatted messages.
+    Embed {
+        /// Title of the embed (max 256 chars)
+        ///
+        /// This appears at the top of the embed and can be a clickable link with --embed-url
+        #[arg(long, value_name = "TEXT")]
+        title: Option<String>,
+
+        /// URL for the embed title (makes title clickable)
+        #[arg(long, value_name = "URL")]
+        embed_url: Option<String>,
+
+        /// Description text (max 4096 chars)
+        ///
+        /// Main content of the embed below the title
+        #[arg(long, value_name = "TEXT")]
+        description: Option<String>,
+
+        /// Embed color as hex (e.g., FF5500 or #FF5500)
+        ///
+        /// Color of the sidebar in the embed
+        #[arg(long, value_name = "HEX")]
+        color: Option<String>,
+
+        /// Thumbnail image URL (shown in top-right)
+        #[arg(long, value_name = "URL")]
+        thumbnail: Option<String>,
+
+        /// Main image URL (shown below description)
+        #[arg(long, value_name = "URL")]
+        image: Option<String>,
+
+        /// Author name (displayed at top)
+        #[arg(long, value_name = "TEXT")]
+        author: Option<String>,
+
+        /// Author icon URL
+        #[arg(long, value_name = "URL")]
+        author_icon: Option<String>,
+
+        /// Footer text
+        #[arg(long, value_name = "TEXT")]
+        footer: Option<String>,
+
+        /// Footer icon URL
+        #[arg(long, value_name = "URL")]
+        footer_icon: Option<String>,
+
+        /// Add a field (can be repeated, format: "name:value:inline")
+        ///
+        /// Use 'true' or 'false' for inline parameter
+        /// Example: --field "Ingredients:item1,item2:true"
+        #[arg(long, value_name = "NAME:VALUE:INLINE")]
+        field: Vec<String>,
+
+        /// Text content above the embed (optional)
+        #[arg(value_name = "TEXT")]
+        content: Option<String>,
+    },
+
     /// Start the hook listener (long-running mode)
     ///
     /// Listens for messages in configured channels and triggers hooks.

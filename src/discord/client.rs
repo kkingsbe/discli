@@ -1,6 +1,6 @@
 //! Discord API client
 
-use crate::discord::api::{send_json_message, send_multipart_message};
+use crate::discord::api::{send_embed_message, send_json_message, send_multipart_message};
 use crate::discord::types::DiscordMessage;
 use crate::error::Result;
 use reqwest::Client;
@@ -69,11 +69,11 @@ impl DiscordClient {
                 send_multipart_message(&self.http_client, &url, &self.token, content, attachments)
                     .await
             }
-            DiscordMessage::WithEmbeds { content: _content, embeds: _embeds } => {
-                // TODO: Implement embed support
-                Err(crate::error::DiscliError::DiscordApi(
-                    "Embed support not yet implemented".into(),
-                ))
+            DiscordMessage::WithEmbeds {
+                content,
+                embeds,
+            } => {
+                send_embed_message(&self.http_client, &url, &self.token, &content, &embeds).await
             }
         }
     }

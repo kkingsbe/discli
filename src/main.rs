@@ -77,6 +77,37 @@ async fn handle_subcommands(
         }) => {
             commands::image::execute(config, attach, caption, embed_url).await
         }
+        Some(cli::Commands::Embed {
+            title,
+            embed_url,
+            description,
+            color,
+            thumbnail,
+            image,
+            author,
+            author_icon,
+            footer,
+            footer_icon,
+            field,
+            content,
+        }) => {
+            commands::embed::execute(
+                config,
+                title,
+                embed_url,
+                description,
+                color,
+                thumbnail,
+                image,
+                author,
+                author_icon,
+                footer,
+                footer_icon,
+                field,
+                content,
+            )
+            .await
+        }
         Some(cli::Commands::Listen {
             foreground,
             hooks_file,

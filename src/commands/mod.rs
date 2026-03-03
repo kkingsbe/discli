@@ -1,5 +1,6 @@
 //! Command implementations
 
+pub mod embed;
 pub mod image;
 pub mod listen;
 pub mod send;
